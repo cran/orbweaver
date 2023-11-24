@@ -1,0 +1,39 @@
+OFFLINE_OPTION = --offline
+VENDORING = yes
+
+TARGET = $(subst 64,x86_64,$(subst 32,i686,$(WIN)))-pc-windows-gnu
+
+TARGET_DIR = ./rust/target
+LIBDIR = $(TARGET_DIR)/$(TARGET)/release
+STATLIB = $(LIBDIR)/liborbweaver.a
+PKG_LIBS = -L$(LIBDIR) -lorbweaver -lws2_32 -ladvapi32 -luserenv -lbcrypt -lntdll
+CARGOTMP = ./rust/.cargo/tmp
+TAR=tar
+
+all: C_clean
+
+$(SHLIB): $(STATLIB)
+
+CARGOTMP = $(CURDIR)/.cargo
+
+$(STATLIB):
+	mkdir -p $(TARGET_DIR)/libgcc_mock && \
+	touch $(TARGET_DIR)/libgcc_mock/libgcc_eh.a && \
+	if [ "$(VENDORING)" = "yes" ]; then \
+	  $(TAR) --extract --xz -f ./rust/vendor.tar.xz -C ./rust && \
+	    mkdir -p ./rust/.cargo && \
+	    cp ./config/cargo_vendor_config.toml ./rust/.cargo/config.toml; \
+	fi && \
+    export CARGO_HOME=$(CARGOTMP); \
+    export CARGO_TARGET_X86_64_PC_WINDOWS_GNU_LINKER="$(CARGO_LINKER)" && \
+    export LIBRARY_PATH="$${LIBRARY_PATH};$(CURDIR)/$(TARGET_DIR)/libgcc_mock" && \
+    cd ./rust && \
+    cargo build --target=$(TARGET) --lib --release $(OFFLINE_OPTION) --jobs 1; \
+    rm -Rf $(CARGOTMP) && \
+    rm -Rf $(LIBDIR)/build; \
+
+C_clean:
+	rm -Rf $(SHLIB) $(STATLIB) $(OBJECTS)
+
+clean:
+	rm -Rf $(SHLIB) $(STATLIB) $(OBJECTS) $(TARGET_DIR)
