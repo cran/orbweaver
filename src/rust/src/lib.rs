@@ -1,226 +1,267 @@
 use extendr_api::prelude::*;
-use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use orbweaver::prelude as ow;
+use std::io::{BufReader, BufWriter};
 
-#[derive(Debug, Clone)]
-struct Node {
-    id: Rc<str>,
-    children: HashSet<Rc<str>>,
-    parents: HashSet<Rc<str>>,
+pub mod from_dataframe;
+mod macros;
+
+pub struct DirectedGraphBuilder(ow::DirectedGraphBuilder);
+pub struct DirectedGraph(ow::DirectedGraph);
+pub struct DirectedAcyclicGraph(ow::DirectedAcyclicGraph);
+
+pub fn to_r_error(err: impl std::error::Error) -> Error {
+    err.to_string().into()
 }
 
-impl Node {
-    fn new(id: Rc<str>) -> Self {
-        Self {
-            id,
-            children: HashSet::new(),
-            parents: HashSet::new(),
-        }
+#[extendr]
+impl DirectedGraphBuilder {
+    fn new() -> Self {
+        DirectedGraphBuilder(ow::DirectedGraphBuilder::new())
+    }
+    fn add_edge(&mut self, from: &str, to: &str) {
+        self.0.add_edge(from, to);
+    }
+    fn add_path(&mut self, path: Strings) {
+        self.0.add_path(path.iter());
+    }
+    /// This will empty the builder
+    fn build_directed(&mut self) -> DirectedGraph {
+        let mut new_builder = Self::new();
+        std::mem::swap(self, &mut new_builder);
+        DirectedGraph(new_builder.0.build_directed())
+    }
+    /// This will empty the builder
+    fn build_acyclic(&mut self) -> Result<DirectedAcyclicGraph> {
+        let mut new_builder = Self::new();
+        std::mem::swap(self, &mut new_builder);
+        Ok(DirectedAcyclicGraph(
+            new_builder.0.build_acyclic().map_err(to_r_error)?,
+        ))
     }
 }
 
-#[derive(IntoDataFrameRow)]
-struct EdgesDFRow {
-    parent: String,
-    child: String,
+trait ImplDirectedGraph: Sized {
+    fn find_path(&self, from: &str, to: &str) -> Result<Vec<&str>>;
+    fn children(&self, nodes: Strings) -> Vec<&str>;
+    fn parents(&self, nodes: Strings) -> Vec<&str>;
+    fn has_parents(&self, nodes: Strings) -> Result<Vec<bool>>;
+    fn has_children(&self, nodes: Strings) -> Result<Vec<bool>>;
+    fn least_common_parents(&self, selected: Strings) -> Result<Vec<&str>>;
+    fn get_all_leaves(&self) -> Vec<&str>;
+    fn get_leaves_under(&self, nodes: Strings) -> Result<Vec<&str>>;
+    fn get_all_roots(&self) -> Vec<String>;
+    fn get_roots_over(&self, node_ids: Vec<String>) -> Result<Vec<&str>>;
+    fn subset(&self, node_id: &str) -> Result<Self>;
+    fn print(&self);
+    fn find_all_paths(&self, from: &str, to: &str) -> Result<List>;
+    fn to_bin_disk(&self, path: &str) -> Result<()>;
+    fn to_bin_mem(&self) -> Result<Vec<u8>>;
+    fn from_bin_disk(path: &str) -> Result<Self>;
+    fn from_bin_mem(bin: &[u8]) -> Result<Self>;
+    fn nodes(&self) -> Vec<&str>;
+    fn length(&self) -> i32;
 }
 
-/// Structure that holds the necessary information to build
-/// a graph with no cycle (including trees).
-#[derive(Debug, Clone)]
-struct AcyclicGraph {
-    nodes: HashMap<Rc<str>, Node>,
-}
+#[extendr]
+impl ImplDirectedGraph for DirectedGraph {
+    fn find_path(&self, from: &str, to: &str) -> Result<Vec<&str>> {
+        self.0.find_path(from, to).map_err(to_r_error)
+    }
+    fn children(&self, nodes: Strings) -> Vec<&str> {
+        self.0.children(nodes.iter()).unwrap_or_default()
+    }
+    fn parents(&self, nodes: Strings) -> Vec<&str> {
+        self.0.parents(nodes.iter()).unwrap_or_default()
+    }
+    fn has_parents(&self, nodes: Strings) -> Result<Vec<bool>> {
+        self.0.has_parents(nodes.iter()).map_err(to_r_error)
+    }
+    fn has_children(&self, nodes: Strings) -> Result<Vec<bool>> {
+        self.0.has_children(nodes.iter()).map_err(to_r_error)
+    }
+    fn least_common_parents(&self, selected: Strings) -> Result<Vec<&str>> {
+        self.0
+            .least_common_parents(selected.iter())
+            .map_err(to_r_error)
+    }
+    fn get_all_leaves(&self) -> Vec<&str> {
+        self.0.get_all_leaves().into_iter().collect()
+    }
+    fn get_leaves_under(&self, nodes: Strings) -> Result<Vec<&str>> {
+        Ok(self
+            .0
+            .get_leaves_under(nodes.iter())
+            .map_err(to_r_error)?
+            .into_iter()
+            .collect())
+    }
+    fn get_all_roots(&self) -> Vec<String> {
+        self.0
+            .get_all_roots()
+            .into_iter()
+            .map(String::from)
+            .collect()
+    }
+    fn get_roots_over(&self, node_ids: Vec<String>) -> Result<Vec<&str>> {
+        self.0.get_roots_over(&node_ids).map_err(to_r_error)
+    }
+    fn subset(&self, node_id: &str) -> Result<Self> {
+        Ok(Self(self.0.subset(node_id).map_err(to_r_error)?))
+    }
+    fn print(&self) {
+        println!("{:?}", self.0)
+    }
 
-impl AcyclicGraph {
-    /// Returns the parents of a node by name.
-    fn parents(&self, node: &str) -> Vec<&str> {
-        self.nodes
-            .get(node)
-            .map(|node| node.parents.iter().map(|parent| parent.as_ref()).collect())
-            .unwrap_or_default()
+    fn to_bin_disk(&self, path: &str) -> Result<()> {
+        let writer = BufWriter::new(
+            std::fs::File::options()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)
+                .map_err(to_r_error)?,
+        );
+        self.0.to_binary(writer).map_err(to_r_error)
     }
-    /// Returns the children of a node by name.
-    fn children(&self, node: &str) -> Vec<&str> {
-        self.nodes
-            .get(node)
-            .map(|node| node.children.iter().map(|child| child.as_ref()).collect())
-            .unwrap_or_default()
+
+    fn to_bin_mem(&self) -> Result<Vec<u8>> {
+        let mut writer = Vec::new();
+        self.0.to_binary(&mut writer).map_err(to_r_error)?;
+        Ok(writer)
     }
-    /// Internal function to build an R list from the graph.
-    /// This function is recursive and should not be called directly.
-    fn as_list_internal<'a>(&'a self, node: &'a str) -> (&str, Robj) {
-        // We create a temporary hashmap to build the list.
-        let mut temp_list = HashMap::new();
-        // We get the children of the current node.
-        let children = self.children(node);
-        // If the children vector is empty, we return the current node and an R object
-        // of type character with an empty string.
-        if children.is_empty() {
-            return (node, Robj::from(""));
-        }
-        // Otherwise we iterate over the children and recursively call the function.
-        children.iter().for_each(|child| {
-            // We get the name of the child and it's list.
-            let (name, child_list) = self.as_list_internal(child);
-            // We insert the child list into the temporary hashmap.
-            temp_list.insert(name.to_string(), child_list);
-        });
-        // We convert the hashmap into an R list.
-        let list = List::from_hashmap(temp_list).unwrap().into_robj();
-        // We return the current node and the list.
-        (node, list)
+
+    fn from_bin_disk(path: &str) -> Result<Self> {
+        let file = BufReader::new(std::fs::File::open(path).map_err(to_r_error)?);
+        ow::DirectedGraph::from_binary(file)
+            .map(DirectedGraph)
+            .map_err(to_r_error)
     }
-    /// FindAllPaths
-    fn internal_find_all_paths(&self, from: &str, to: &str) -> Vec<Vec<String>> {
-        let mut all_paths = Vec::new();
-        let path = vec![from.to_string()];
-        self.dfs(from, to, path, &mut all_paths);
-        all_paths
+
+    fn from_bin_mem(bin: &[u8]) -> Result<Self> {
+        ow::DirectedGraph::from_binary(bin)
+            .map(DirectedGraph)
+            .map_err(to_r_error)
     }
-    fn dfs(&self, from: &str, to: &str, mut path: Vec<String>, all_paths: &mut Vec<Vec<String>>) {
-        if from == to {
-            all_paths.push(path)
-        } else {
-            for child in self.children(from) {
-                path.push(child.to_string());
-                self.dfs(child, to, path.clone(), all_paths);
-                path.pop();
-            }
-        }
+
+    fn nodes(&self) -> Vec<&str> {
+        self.0.nodes()
+    }
+
+    fn length(&self) -> i32 {
+        self.0.len() as i32
+    }
+
+    fn find_all_paths(&self, _from: &str, _to: &str) -> Result<List> {
+        todo!("Find all paths is not implemented for DirectedGraph")
     }
 }
 
 #[extendr]
-impl AcyclicGraph {
-    /// Creates a new graph with a root node.
-    fn new() -> Self {
-        let nodes = HashMap::new();
-        Self { nodes }
+impl ImplDirectedGraph for DirectedAcyclicGraph {
+    fn find_path(&self, from: &str, to: &str) -> Result<Vec<&str>> {
+        self.0.find_path(from, to).map_err(to_r_error)
     }
-    /// Adds a node to the graph. If the node already exists, it does nothing.
-    fn add_node(&mut self, node_id: &str) {
-        let node_id: Rc<str> = node_id.into();
-        self.nodes
-            .entry(node_id.clone())
-            .or_insert_with(|| Node::new(node_id));
+    fn children(&self, nodes: Strings) -> Vec<&str> {
+        self.0.children(nodes.iter()).unwrap_or_default()
     }
-    /// Adds a child to a node.
-    fn add_child(&mut self, parent_id: &str, child_id: &str) {
-        self.add_node(parent_id);
-        self.add_node(child_id);
-        self.nodes
-            .get_mut(parent_id)
-            .expect("Parent not found")
-            .children
-            .insert(child_id.into());
-        self.nodes
-            .get_mut(child_id)
-            .expect("Child not found")
-            .parents
-            .insert(parent_id.into());
+    fn parents(&self, nodes: Strings) -> Vec<&str> {
+        self.0.parents(nodes.iter()).unwrap_or_default()
     }
-    /// Returns the children of a node.
-    fn get_children(&self, node: &str) -> Vec<&str> {
-        self.children(node)
+    fn has_parents(&self, nodes: Strings) -> Result<Vec<bool>> {
+        self.0.has_parents(nodes.iter()).map_err(to_r_error)
     }
-    /// Returns the parents of a node.
-    fn get_parents(&self, node: &str) -> Vec<&str> {
-        self.parents(node)
+    fn has_children(&self, nodes: Strings) -> Result<Vec<bool>> {
+        self.0.has_children(nodes.iter()).map_err(to_r_error)
     }
-    /// Returns the leaves of the graph.
-    fn find_leaves(&self, node: &str) -> Vec<&str> {
-        let node = self.nodes.get(node).unwrap();
-        if node.children.is_empty() {
-            return vec![node.id.as_ref()];
-        }
-        node.children
-            .iter()
-            .flat_map(|child| self.find_leaves(child))
-            .unique()
+    fn least_common_parents(&self, selected: Strings) -> Result<Vec<&str>> {
+        self.0
+            .least_common_parents(selected.iter())
+            .map_err(to_r_error)
+    }
+    fn get_all_leaves(&self) -> Vec<&str> {
+        self.0.get_all_leaves().into_iter().collect()
+    }
+    fn get_leaves_under(&self, nodes: Strings) -> Result<Vec<&str>> {
+        Ok(self
+            .0
+            .get_leaves_under(nodes.iter())
+            .map_err(to_r_error)?
+            .into_iter()
+            .collect())
+    }
+    fn get_all_roots(&self) -> Vec<String> {
+        self.0
+            .get_all_roots()
+            .into_iter()
+            .map(String::from)
             .collect()
     }
-    /// Returns the least common parents of a set of nodes.
-    fn find_least_common_parents(&self, selected: Vec<String>) -> Vec<&str> {
-        let selected: HashSet<_> = selected.into_iter().collect();
-        self.nodes
-            .iter()
-            .filter(|(id, _)| selected.contains(id.as_ref()))
-            .filter(|(_, node)| {
-                let contains_selected_parent = node
-                    .parents
-                    .iter()
-                    .any(|parent| selected.contains(parent.as_ref()));
-                !contains_selected_parent
-            })
-            .map(|(id, _)| id.as_ref())
-            .unique()
-            .collect()
+    fn get_roots_over(&self, node_ids: Vec<String>) -> Result<Vec<&str>> {
+        self.0.get_roots_over(&node_ids).map_err(to_r_error)
     }
-    /// Gets the root of the graph.
-    fn find_roots(&self) -> Vec<&str> {
-        self.nodes
-            .iter()
-            .filter(|(_, node)| node.parents.is_empty())
-            .map(|(id, _)| id.as_ref())
-            .unique()
-            .collect()
+    fn subset(&self, node_id: &str) -> Result<Self> {
+        Ok(Self(self.0.subset(node_id).map_err(to_r_error)?))
     }
-    /// Returns the graph as an R list. (Useful for libraries like `shinyTree`).
-    fn as_list(&self) -> Robj {
-        let list = self
-            .nodes
-            .iter()
-            .filter(|(_, node)| node.parents.is_empty())
-            .map(|(id, _)| self.as_list_internal(id))
-            .collect::<Vec<_>>();
-        List::from_pairs(list).into_robj()
+    fn print(&self) {
+        println!("{:?}", self.0)
     }
-    /// Creates an acyclic graph from a data frame.
-    fn from_dataframe(dataframe: Robj) -> Self {
-        let dataframe: Dataframe<EdgesDFRow> = dataframe.try_into().expect("Invalid data frame");
-        let mut graph = Self::new();
-        let parents = dataframe
-            .index("parent")
-            .expect("Column 'parent' not found");
-        let parents = parents.as_str_vector().expect("Invalid parent column");
-        let children = dataframe.index("child").expect("Column 'child' not found");
-        let children = children.as_str_vector().expect("Invalid child column");
-        // Iterate over the parents and children and add them to the graph.
-        parents
-            .iter()
-            .zip(children)
-            .for_each(|(parent, child)| graph.add_child(parent, child));
-        graph
+
+    fn to_bin_disk(&self, path: &str) -> Result<()> {
+        let writer = BufWriter::new(
+            std::fs::File::options()
+                .write(true)
+                .create(true)
+                .truncate(true)
+                .open(path)
+                .map_err(to_r_error)?,
+        );
+        self.0.to_binary(writer).map_err(to_r_error)
     }
-    /// Creates a new copy of the graph.
-    fn graph_clone(&self) -> Self {
-        self.clone()
+
+    fn to_bin_mem(&self) -> Result<Vec<u8>> {
+        let mut writer = Vec::new();
+        self.0.to_binary(&mut writer).map_err(to_r_error)?;
+        Ok(writer)
     }
-    /// Search for similarly named nodes.
-    fn search_for_node(&self, node_id: &str, case_sensitive: bool) -> Vec<&str> {
-        self.nodes
-            .keys()
-            .filter(|id| {
-                if case_sensitive {
-                    id.contains(node_id)
-                } else {
-                    id.to_lowercase().contains(&node_id.to_lowercase())
-                }
-            })
-            .map(|id| id.as_ref())
-            .sorted_by_key(|id| id.len())
-            .collect()
+
+    fn from_bin_disk(path: &str) -> Result<Self> {
+        let file = BufReader::new(std::fs::File::open(path).map_err(to_r_error)?);
+        ow::DirectedAcyclicGraph::from_binary(file)
+            .map(DirectedAcyclicGraph)
+            .map_err(to_r_error)
     }
-    /// find_all_paths
-    fn find_all_paths(&self, from: &str, to: &str) -> List {
-        let paths = self.internal_find_all_paths(from, to).into_iter();
-        List::from_iter(paths)
+
+    fn from_bin_mem(bin: &[u8]) -> Result<Self> {
+        ow::DirectedAcyclicGraph::from_binary(bin)
+            .map(DirectedAcyclicGraph)
+            .map_err(to_r_error)
+    }
+
+    fn nodes(&self) -> Vec<&str> {
+        self.0.nodes()
+    }
+
+    fn length(&self) -> i32 {
+        self.0.len() as i32
+    }
+
+    fn find_all_paths(&self, from: &str, to: &str) -> Result<List> {
+        Ok(self
+            .0
+            .find_all_paths(from, to)
+            .map_err(to_r_error)?
+            .into_iter()
+            .collect())
     }
 }
 
+// Macro to generate exports.
+// This ensures exported functions are registered with R.
+// See corresponding C code in `entrypoint.c`.
 extendr_module! {
     mod orbweaver;
-    impl AcyclicGraph;
+    impl DirectedGraph;
+    impl DirectedAcyclicGraph;
+    impl DirectedGraphBuilder;
+    use from_dataframe;
 }
