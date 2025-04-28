@@ -19,10 +19,28 @@ A character vector
 \description{
 Finds a path between two nodes in a graph.
 
-Different types of graphs use different algorithims to
+Different types of graphs use different algorithms to
 find the paths. a \code{DirectedGraph} uses breadth-first search
 while an \code{DirectedAcyclicGraph} uses topological sort.
 
 The path is represented as a character vector with the
 node ids of the nodes that make up the path.
 }
+\examples{
+graph <- graph_builder() |>
+  add_path(c("A", "B", "C")) |>
+  build_directed()
+
+find_path(graph, "A", "C")
+}
+\seealso{
+Other analyze graphs: 
+\code{\link{find_all_paths}()},
+\code{\link{find_path_one_to_many}()},
+\code{\link{get_all_leaves}()},
+\code{\link{get_all_roots}()},
+\code{\link{get_leaves_under}()},
+\code{\link{get_roots_over}()},
+\code{\link{least_common_parents}()}
+}
+\concept{analyze graphs}

@@ -4,11 +4,26 @@
 \alias{graph_builder}
 \title{A new builder for a graph based on the type}
 \usage{
-graph_builder(type = "directed")
+graph_builder(type = c("directed"))
 }
 \arguments{
 \item{type}{The type of graph}
 }
+\value{
+An object of class 'DirectedGraphBuilder'.
+}
 \description{
 Object used to build graphs
 }
+\examples{
+graph_builder()
+}
+\seealso{
+Other build graphs: 
+\code{\link{add_edge}()},
+\code{\link{add_path}()},
+\code{\link{build_acyclic}()},
+\code{\link{build_directed}()},
+\code{\link{populate_edges}()}
+}
+\concept{build graphs}

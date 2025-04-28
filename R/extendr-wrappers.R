@@ -34,9 +34,11 @@ DirectedGraph$get_all_roots <- function() .Call(wrap__DirectedGraph__get_all_roo
 
 DirectedGraph$get_roots_over <- function(node_ids) .Call(wrap__DirectedGraph__get_roots_over, self, node_ids)
 
-DirectedGraph$subset <- function(node_id) .Call(wrap__DirectedGraph__subset, self, node_id)
+DirectedGraph$subset_multi <- function(node_ids) .Call(wrap__DirectedGraph__subset_multi, self, node_ids)
 
-DirectedGraph$print <- function() invisible(.Call(wrap__DirectedGraph__print, self))
+DirectedGraph$subset_multi_with_limit <- function(node_ids, limit) .Call(wrap__DirectedGraph__subset_multi_with_limit, self, node_ids, limit)
+
+DirectedGraph$print <- function() .Call(wrap__DirectedGraph__print, self)
 
 DirectedGraph$to_bin_disk <- function(path) .Call(wrap__DirectedGraph__to_bin_disk, self, path)
 
@@ -50,7 +52,13 @@ DirectedGraph$nodes <- function() .Call(wrap__DirectedGraph__nodes, self)
 
 DirectedGraph$length <- function() .Call(wrap__DirectedGraph__length, self)
 
-DirectedGraph$find_all_paths <- function(`_from`, `_to`) .Call(wrap__DirectedGraph__find_all_paths, self, `_from`, `_to`)
+DirectedGraph$find_all_paths <- function(from, to) .Call(wrap__DirectedGraph__find_all_paths, self, from, to)
+
+DirectedGraph$find_path_one_to_many <- function(from, to) .Call(wrap__DirectedGraph__find_path_one_to_many, self, from, to)
+
+DirectedGraph$as_data_frame <- function() .Call(wrap__DirectedGraph__as_data_frame, self)
+
+DirectedGraph$get_leaves_as_df <- function(nodes) .Call(wrap__DirectedGraph__get_leaves_as_df, self, nodes)
 
 #' @export
 `$.DirectedGraph` <- function (self, name) { func <- DirectedGraph[[name]]; environment(func) <- environment(); func }
@@ -80,9 +88,11 @@ DirectedAcyclicGraph$get_all_roots <- function() .Call(wrap__DirectedAcyclicGrap
 
 DirectedAcyclicGraph$get_roots_over <- function(node_ids) .Call(wrap__DirectedAcyclicGraph__get_roots_over, self, node_ids)
 
-DirectedAcyclicGraph$subset <- function(node_id) .Call(wrap__DirectedAcyclicGraph__subset, self, node_id)
+DirectedAcyclicGraph$subset_multi <- function(node_ids) .Call(wrap__DirectedAcyclicGraph__subset_multi, self, node_ids)
 
-DirectedAcyclicGraph$print <- function() invisible(.Call(wrap__DirectedAcyclicGraph__print, self))
+DirectedAcyclicGraph$subset_multi_with_limit <- function(node_ids, limit) .Call(wrap__DirectedAcyclicGraph__subset_multi_with_limit, self, node_ids, limit)
+
+DirectedAcyclicGraph$print <- function() .Call(wrap__DirectedAcyclicGraph__print, self)
 
 DirectedAcyclicGraph$to_bin_disk <- function(path) .Call(wrap__DirectedAcyclicGraph__to_bin_disk, self, path)
 
@@ -98,6 +108,12 @@ DirectedAcyclicGraph$length <- function() .Call(wrap__DirectedAcyclicGraph__leng
 
 DirectedAcyclicGraph$find_all_paths <- function(from, to) .Call(wrap__DirectedAcyclicGraph__find_all_paths, self, from, to)
 
+DirectedAcyclicGraph$find_path_one_to_many <- function(from, to) .Call(wrap__DirectedAcyclicGraph__find_path_one_to_many, self, from, to)
+
+DirectedAcyclicGraph$as_data_frame <- function() .Call(wrap__DirectedAcyclicGraph__as_data_frame, self)
+
+DirectedAcyclicGraph$get_leaves_as_df <- function(nodes) .Call(wrap__DirectedAcyclicGraph__get_leaves_as_df, self, nodes)
+
 #' @export
 `$.DirectedAcyclicGraph` <- function (self, name) { func <- DirectedAcyclicGraph[[name]]; environment(func) <- environment(); func }
 
@@ -110,7 +126,7 @@ DirectedGraphBuilder$new <- function() .Call(wrap__DirectedGraphBuilder__new)
 
 DirectedGraphBuilder$add_edge <- function(from, to) invisible(.Call(wrap__DirectedGraphBuilder__add_edge, self, from, to))
 
-DirectedGraphBuilder$add_path <- function(path) invisible(.Call(wrap__DirectedGraphBuilder__add_path, self, path))
+DirectedGraphBuilder$add_path <- function(path) .Call(wrap__DirectedGraphBuilder__add_path, self, path)
 
 DirectedGraphBuilder$build_directed <- function() .Call(wrap__DirectedGraphBuilder__build_directed, self)
 
@@ -121,6 +137,22 @@ DirectedGraphBuilder$build_acyclic <- function() .Call(wrap__DirectedGraphBuilde
 
 #' @export
 `[[.DirectedGraphBuilder` <- `$.DirectedGraphBuilder`
+
+NodeVec <- new.env(parent = emptyenv())
+
+NodeVec$print <- function() .Call(wrap__NodeVec__print, self)
+
+NodeVec$as_character <- function() .Call(wrap__NodeVec__as_character, self)
+
+NodeVec$len <- function() .Call(wrap__NodeVec__len, self)
+
+NodeVec$is_empty <- function() .Call(wrap__NodeVec__is_empty, self)
+
+#' @export
+`$.NodeVec` <- function (self, name) { func <- NodeVec[[name]]; environment(func) <- environment(); func }
+
+#' @export
+`[[.NodeVec` <- `$.NodeVec`
 
 
 # nolint end

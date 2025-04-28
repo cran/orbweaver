@@ -1,16 +1,15 @@
 [package]
-name = 'orbweaver_r'
-version = '0.1.0'
+name = 'orbweaver'
+version = '0.18.2'
 edition = '2021'
 
 [lib]
-crate-type = [ 'staticlib' ]
+crate-type = [ 'staticlib', 'lib' ]
 name = 'orbweaver'
 
 [dependencies]
-# extendr-api = { version = "0.6", features = ["serde"] }
-extendr-api = { git = "https://github.com/extendr/extendr.git", rev = "cb85a21a90c3fcb538a40fcea03058454edb3dac" }
-orbweaver = { version = "0.10.1" }
+ow = { package = "orbweaver", version = "0.18.2" }
+extendr-api = { version = "0.8", features = ["serde", "result_condition"] }
 
 # This will help us filter the platforms
 # we support to make the final bundle size

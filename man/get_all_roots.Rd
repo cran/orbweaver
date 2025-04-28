@@ -17,3 +17,23 @@ A character vector of nodes
 \description{
 Retrieves the nodes in a graph that have no parents
 }
+\examples{
+graph <- graph_builder() |>
+  add_path(c("A", "B", "C")) |>
+  add_path(c("A", "D", "C")) |>
+  add_path(c("Z", "B", "C")) |>
+  build_directed()
+
+get_all_roots(graph)
+}
+\seealso{
+Other analyze graphs: 
+\code{\link{find_all_paths}()},
+\code{\link{find_path}()},
+\code{\link{find_path_one_to_many}()},
+\code{\link{get_all_leaves}()},
+\code{\link{get_leaves_under}()},
+\code{\link{get_roots_over}()},
+\code{\link{least_common_parents}()}
+}
+\concept{analyze graphs}

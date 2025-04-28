@@ -17,3 +17,15 @@ Run for its side-effects
 \description{
 Save the graph into a binary blob
 }
+\examples{
+graph <- graph_builder() |>
+  add_edge("A", "B") |>
+  build_directed()
+
+graph_to_bin(graph)
+}
+\seealso{
+Other graphs i/o: 
+\code{\link{graph_from_bin}()}
+}
+\concept{graphs i/o}

@@ -1,9 +1,16 @@
 #' @title A new builder for a graph based on the type
 #' @description Object used to build graphs
 #' @param type The type of graph
+#' @return An object of class 'DirectedGraphBuilder'.
 #' @export
-graph_builder <- function(type = "directed") {
-  DirectedGraphBuilder$new()
+#' @family build graphs
+#' @examples
+#' graph_builder()
+graph_builder <- function(type = c("directed")) {
+  switch(
+    rlang::arg_match(type),
+    "directed" = DirectedGraphBuilder$new()
+  )
 }
 
 #' @title Add an edge to a graph builder
@@ -17,8 +24,12 @@ graph_builder <- function(type = "directed") {
 #' @param to The `to` node.
 #' @return The updated graph builder object
 #' @export
+#' @family build graphs
+#' @examples
+#' graph_builder() |>
+#'   add_edge("A", "B")
 add_edge <- function(graph_builder, from, to) {
-  graph_builder$add_edge(from, to)
+  throw_if_error(graph_builder$add_edge(from, to))
   return(graph_builder)
 }
 
@@ -32,8 +43,12 @@ add_edge <- function(graph_builder, from, to) {
 #' @param path A character vector that describes the path
 #' @return The updated graph builder object
 #' @export
+#' @family build graphs
+#' @examples
+#' graph_builder() |>
+#'   add_path(c("A", "B", "C"))
 add_path <- function(graph_builder, path) {
-  graph_builder$add_path(path)
+  throw_if_error(graph_builder$add_path(path))
   return(graph_builder)
 }
 
@@ -49,8 +64,13 @@ add_path <- function(graph_builder, path) {
 #' @param graph_builder A graph builder object
 #' @return A DirectedGraph Object
 #' @export
+#' @family build graphs
+#' @examples
+#' graph_builder() |>
+#'   add_path(c("1", "2", "3", "4")) |>
+#'   build_directed()
 build_directed <- function(graph_builder) {
-  graph_builder$build_directed()
+  throw_if_error(graph_builder$build_directed())
 }
 
 #' @title Build a DirectedAcyclicGraph from a builder
@@ -63,18 +83,36 @@ build_directed <- function(graph_builder) {
 #' @param graph_builder A graph builder object
 #' @return A DirectedAcyclicGraph Object
 #' @export
+#' @family build graphs
+#' @examples
+#' graph_builder() |>
+#'   add_path(c("1", "2", "3", "4")) |>
+#'   build_acyclic()
 build_acyclic <- function(graph_builder) {
-  graph_builder$build_acyclic()
+  throw_if_error(graph_builder$build_acyclic())
 }
 
-#' @title Populates the edges of a graph from a `tibble`
-#' @description Adds a set of edges from a `tibble` to a graph
+#' @title Populates the edges of a graph from a `data.frame`
+#' @description Adds a set of edges from a `data.frame` to a graph
 #' @param graph_builder A graph builder object
-#' @param edges_df A `tibble` with a parent and child variable
+#' @param edges_df A `data.frame` with a parent and child variable
 #' @param parent_col The name of the column containing the parents
 #' @param child_col The name of the column containing the children
 #' @return The updated graph builder object
 #' @export
+#' @family build graphs
+#' @examples
+#' graph_edges <- data.frame(
+#'   parent = c("A", "B", "C"),
+#'   child = c("B", "C", "D")
+#' )
+#'
+#' graph_builder() |>
+#'   populate_edges(
+#'     edges_df = graph_edges,
+#'     parent_col = "parent",
+#'     child_col = "child"
+#'   )
 populate_edges <- function(graph_builder, edges_df, parent_col, child_col) {
   parent_col <- as.character(rlang::ensym(parent_col))
   child_col <- as.character(rlang::ensym(child_col))
@@ -88,6 +126,8 @@ populate_edges <- function(graph_builder, edges_df, parent_col, child_col) {
     rlang::abort(glue::glue("Column {child_col} is not of class `character`"))
   }
 
-  rs_populate_edges_builder(graph_builder, parent_iter, child_iter)
+  throw_if_error(
+    rs_populate_edges_builder(graph_builder, parent_iter, child_iter)
+  )
   return(graph_builder)
 }

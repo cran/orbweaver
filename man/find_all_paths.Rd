@@ -22,3 +22,23 @@ Find all the paths between two nodes in a graph.
 Not all graphs support this function. Currently only
 \code{DirectedAcyclicGraph} supports this.
 }
+\examples{
+graph <- graph_builder() |>
+  add_path(c("A", "B", "C")) |>
+  add_path(c("A", "Z", "C")) |>
+  add_path(c("A", "B", "A")) |>
+  build_directed()
+
+find_all_paths(graph, "A", "C")
+}
+\seealso{
+Other analyze graphs: 
+\code{\link{find_path}()},
+\code{\link{find_path_one_to_many}()},
+\code{\link{get_all_leaves}()},
+\code{\link{get_all_roots}()},
+\code{\link{get_leaves_under}()},
+\code{\link{get_roots_over}()},
+\code{\link{least_common_parents}()}
+}
+\concept{analyze graphs}
